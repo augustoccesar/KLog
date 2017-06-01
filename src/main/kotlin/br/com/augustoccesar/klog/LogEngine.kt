@@ -13,25 +13,15 @@ import java.time.ZonedDateTime
  * Date: 31/05/17
  */
 class LogEngine() {
-    private val gson by lazy { buildDefaultJson() }
-    private val events: MutableList<Event> = mutableListOf()
-    private val indices: MutableList<Event> = mutableListOf()
-    private val watchers: MutableList<Event> = mutableListOf()
+    private val events: MutableMap<String, Event> = mutableMapOf()
     private var outputFile: File? = null
 
     constructor(outputFile: File) : this() {
         this.registerOutputFile(outputFile)
     }
 
-    private fun buildDefaultJson(): Gson {
-        return GsonBuilder()
-                .setPrettyPrinting()
-                .registerTypeAdapter(ZonedDateTime::class.java, ZonedDateTimeAdapter())
-                .create()
-    }
-
     fun findEvent(eventKey: String): Event? {
-        return indices.filter { it.key == eventKey }.firstOrNull()
+        return this.events[eventKey]
     }
 
     fun registerOutputFile(outputFile: File) {
@@ -40,21 +30,41 @@ class LogEngine() {
 
     fun registerEvent(event: Event, parentKey: String? = null) {
         if (parentKey == null) {
-            this.events.add(event)
+            this.events.put(event.key, event)
         } else {
-            findEvent(parentKey)?.subEvents?.add(event)
+            event.parent = findEvent(parentKey)
+            this.events.put(event.key, event)
+        }
+    }
+
+    fun buildPrintableStructure(): List<Event> {
+        val list = mutableListOf<Event>()
+
+        this.events.forEach { key, value ->
+            if (value.parent != null) {
+                value.parent?.subEvents?.add(value)
+            } else {
+                list.add(value)
+            }
         }
 
-        this.indices.add(event)
+        return list
     }
 
     fun write() {
-        if(this.outputFile?.parent != null) {
+        val output = buildPrintableStructure()
+
+        val gson = GsonBuilder()
+                .setPrettyPrinting()
+                .registerTypeAdapter(ZonedDateTime::class.java, ZonedDateTimeAdapter())
+                .create()
+
+        if (this.outputFile?.parent != null) {
             File(this.outputFile?.parent).mkdirs()
         }
 
         this.outputFile?.printWriter().use { out ->
-            out?.print(gson.toJson(this.events.sortedWith(compareBy({ it.startTime }))))
+            out?.print(gson.toJson(output))
         }
     }
 }

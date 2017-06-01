@@ -12,6 +12,7 @@ open class Event(var key: String,
                  var message: String,
                  var status: String? = null,
                  var cause: Cause? = null,
+                 @Transient var parent: Event? = null,
                  @SerializedName("start_time") var startTime: ZonedDateTime = ZonedDateTime.now(ZoneOffset.UTC),
                  @SerializedName("end_time") var endTime: ZonedDateTime? = null,
                  @SerializedName("sub_events") var subEvents: MutableList<Event> = mutableListOf()) {
